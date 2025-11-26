@@ -1,0 +1,288 @@
+UDP a) hello msg
+--step1) nano udp_hello_server.c
+--step2) paste below code:
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define PORT 8080
+#define BUF_SIZE 1024
+
+int main() {
+    int sockfd;
+    char buffer[BUF_SIZE];
+    char *hello = "Hello from Server!";
+    struct sockaddr_in servaddr, cliaddr;
+    socklen_t len = sizeof(cliaddr);
+
+    // 1. Create UDP socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // 2. Clear and fill server address structure
+    memset(&servaddr, 0, sizeof(servaddr));
+    memset(&cliaddr, 0, sizeof(cliaddr));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = INADDR_ANY;  // listen on all interfaces
+    servaddr.sin_port = htons(PORT);
+
+    // 3. Bind socket to port
+    if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+        perror("bind failed");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("UDP Hello Server listening on port %d...\n", PORT);
+
+    // 4. Receive hello from client
+    recvfrom(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)&cliaddr, &len);
+    printf("Client says: %s\n", buffer);
+
+    // 5. Send hello back to client
+    sendto(sockfd, hello, strlen(hello), 0,
+           (const struct sockaddr *)&cliaddr, len);
+    printf("Hello message sent to client.\n");
+
+    // 6. Close socket
+    close(sockfd);
+    return 0;
+}
+
+--step3) Press Ctrl + O → Enter, Press Ctrl + X
+--step4) nano udp_hello_client.c
+--step5) paste below code
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define PORT 8080
+#define BUF_SIZE 1024
+
+int main() {
+    int sockfd;
+    char buffer[BUF_SIZE];
+    char *hello = "Hello from Client!";
+    struct sockaddr_in servaddr;
+    socklen_t len = sizeof(servaddr);
+
+    // 1. Create UDP socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // 2. Clear and fill server address
+    memset(&servaddr, 0, sizeof(servaddr));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(PORT);
+    servaddr.sin_addr.s_addr = INADDR_ANY;  // or server IP for remote
+
+    // 3. Send hello to server
+    sendto(sockfd, hello, strlen(hello), 0,
+           (const struct sockaddr *)&servaddr, len);
+    printf("Hello message sent to server.\n");
+
+    // 4. Receive reply from server
+    recvfrom(sockfd, buffer, BUF_SIZE, 0,
+             (struct sockaddr *)&servaddr, &len);
+    printf("Server says: %s\n", buffer);
+
+    // 5. Close socket
+    close(sockfd);
+    return 0;
+}
+
+--step6)Press Ctrl + O, Enter, Ctrl + X
+--step7) run:
+gcc udp_hello_server.c -o udp_hello_server
+gcc udp_hello_client.c -o udp_hello_client
+--step8) terminal 1 run
+./udp_hello_server
+--step9) terminal 2 run
+./udp_hello_client
+
+((((((((b) Calculator Trigonometry
+--step1] nano udp_trig_server.c
+--step2] paste below code:
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define PORT 8081
+#define BUF_SIZE 1024
+
+int main() {
+    int sockfd;
+    char buffer[BUF_SIZE];
+    struct sockaddr_in servaddr, cliaddr;
+    socklen_t len = sizeof(cliaddr);
+
+    // 1. Create UDP socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // 2. Clear address structures
+    memset(&servaddr, 0, sizeof(servaddr));
+    memset(&cliaddr, 0, sizeof(cliaddr));
+
+    // 3. Fill server address
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = INADDR_ANY;
+    servaddr.sin_port = htons(PORT);
+
+    // 4. Bind socket
+    if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+        perror("bind failed");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("UDP Trigonometry Server running on port %d...\n", PORT);
+
+    // 5. Main loop: receive request, compute, send result
+    while (1) {
+        // Receive string like: "sin 1.5708"
+        recvfrom(sockfd, buffer, BUF_SIZE, 0,
+                 (struct sockaddr *)&cliaddr, &len);
+        buffer[strcspn(buffer, "\n")] = 0; // remove newline
+
+        char func[10];
+        double val, result;
+        sscanf(buffer, "%s %lf", func, &val);
+
+        if (strcasecmp(func, "sin") == 0)
+            result = sin(val);
+        else if (strcasecmp(func, "cos") == 0)
+            result = cos(val);
+        else if (strcasecmp(func, "tan") == 0)
+            result = tan(val);
+        else {
+            sprintf(buffer, "Invalid function");
+            sendto(sockfd, buffer, strlen(buffer), 0,
+                   (const struct sockaddr *)&cliaddr, len);
+            continue;
+        }
+
+        // Put result back into buffer and send to client
+        sprintf(buffer, "%.6lf", result);
+        sendto(sockfd, buffer, strlen(buffer), 0,
+               (const struct sockaddr *)&cliaddr, len);
+    }
+
+    close(sockfd);
+    return 0;
+}
+
+--step3] Press Ctrl + O → Enter, Press Ctrl + X
+--step4] nano udp_trig_client.c
+--step5] paste
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define PORT 8081
+#define BUF_SIZE 1024
+
+int main() {
+    int sockfd;
+    char buffer[BUF_SIZE];
+    char input[BUF_SIZE];
+    struct sockaddr_in servaddr;
+    socklen_t len = sizeof(servaddr);
+
+    // 1. Create UDP socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // 2. Clear and fill server address
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(PORT);
+    servaddr.sin_addr.s_addr = INADDR_ANY;   // change to server IP if remote
+
+    // 3. Take user input like: "sin 1.5708"
+    printf("Enter function and value (e.g., sin 1.5708): ");
+    fgets(input, BUF_SIZE, stdin);
+
+    // 4. Send input string to server
+    sendto(sockfd, input, strlen(input), 0,
+           (const struct sockaddr *)&servaddr, len);
+
+    // 5. Receive result from server
+    recvfrom(sockfd, buffer, BUF_SIZE, 0,
+             (struct sockaddr *)&servaddr, &len);
+    buffer[strcspn(buffer, "\n")] = 0;
+
+    printf("Result: %s\n", buffer);
+
+    // 6. Close socket
+    close(sockfd);
+    return 0;
+}
+
+--step6] paste:
+gcc udp_trig_server.c -o udp_trig_server -lm
+gcc udp_trig_client.c -o udp_trig_client -lm
+--step7] in terminal1:
+./udp_trig_server
+--step8] in terminal2:
+./udp_trig_client
+--step9] type:
+sin 1.57
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1) UDP HELLO Message – Explanation
+
+In the UDP Hello program, we implement a simple client–server application using UDP datagrams instead of TCP streams. 
+The server creates a UDP socket using socket(AF_INET, SOCK_DGRAM, 0), binds it to a port (8080) with bind(), and waits for a message. 
+The client also creates a UDP socket and fills a sockaddr_in structure with the server’s IP and port. 
+The client sends a “Hello from Client” message using sendto(). 
+The server receives this datagram using recvfrom(), prints the client’s message, and then sends back “Hello from Server!” using sendto(). 
+The client receives this reply with recvfrom() and prints it. 
+In UDP there is no connection setup like connect()/accept(); communication is connectionless and each message is sent as an independent datagram.
+
+2) UDP Trigonometry Calculator – Explanation
+
+In the UDP Trigonometry Calculator, we extend the UDP concept to perform remote trigonometric calculations. 
+The UDP server creates a datagram socket on port 8081 and continuously waits for requests. 
+The client asks the user to enter a function and value, for example sin 1.5708, and sends this string to the server using sendto(). 
+The server receives the string with recvfrom(), parses it into the function name and numeric value using sscanf(), then uses the C math library (sin(), cos(), tan()) to compute the result. 
+The result is converted back into a string with sprintf() and sent to the client using sendto(). 
+The client receives this reply with recvfrom() and displays the result. 
+This program shows how UDP can be used for request–response style services where each datagram carries one complete query and one complete reply, without establishing a persistent connection like TCP.
